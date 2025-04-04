@@ -3,10 +3,10 @@ import logging
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from api_erp.main import api_erp
-from main_config import logging_config
+from api_erp.main import app_api_erp
+from core.logger import logging_config
 
-app: FastAPI = api_erp  # main app
+app: FastAPI = app_api_erp  # main app
 logger = logging.getLogger(__name__)
 logging_config(level=logging.INFO)
 

@@ -1,11 +1,21 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
-api_erp: FastAPI = FastAPI()
+from api_erp.utils.database import init_pg_db
 
-api_erp.mount('/static', StaticFiles(directory='api_erp/static'), name='static')
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_pg_db()  # Створюємо таблиці
+    yield
+
+app_api_erp: FastAPI = FastAPI(title='RAX-ERP',
+                               lifespan=lifespan)
+
+app_api_erp.mount('/static', StaticFiles(directory='static/api_erp'), name='static')
 templates = Jinja2Templates(directory='templates/api_erp')
 
 origins = [
@@ -13,7 +23,7 @@ origins = [
     "http://localhost:3000",
 ]
 
-api_erp.add_middleware(
+app_api_erp.add_middleware(
     CORSMiddleware,
     allow_origins=['*'],
     allow_credentials=True,
