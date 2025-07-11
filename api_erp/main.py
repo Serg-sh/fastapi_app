@@ -6,6 +6,8 @@ from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
 from api_erp.utils.database import init_pg_db
+from auth import endpoints
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -14,6 +16,7 @@ async def lifespan(app: FastAPI):
 
 app_api_erp: FastAPI = FastAPI(title='RAX-ERP',
                                lifespan=lifespan)
+app_api_erp.include_router(endpoints.router)
 
 app_api_erp.mount('/static', StaticFiles(directory='static/api_erp'), name='static')
 templates = Jinja2Templates(directory='templates/api_erp')
