@@ -30,7 +30,10 @@ class Role(Base):
     __tablename__ = 'roles'
     id = Column(Integer, primary_key=True)
     name_role = Column(String, unique=True, nullable=False)
-    permissions = relationship('Permission', secondary=role_permissions, backref='roles')
+    permissions = relationship('Permission',
+                               secondary=role_permissions,
+                               backref='roles',
+                               cascade='all, delete')
 
 
 class User(Base):
@@ -40,4 +43,7 @@ class User(Base):
     email = Column(String)
     password = Column(String)
     status = Column(Boolean, default=True)
-    roles = relationship('Role', secondary=user_roles, backref='users')
+    roles = relationship('Role',
+                         secondary=user_roles,
+                         backref='users',
+                         cascade='all, delete')

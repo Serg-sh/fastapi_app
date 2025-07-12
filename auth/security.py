@@ -30,7 +30,11 @@ def get_password_hash(password: str) -> str:
 
 
 async def authenticate_user(db: AsyncSession, email: str, password: str):
-    result = await db.execute(select(models.User).where(models.User.email == email))
+    result = await db.execute(select(models.User)
+                              .options(selectinload(models.User.roles)
+                                       .selectinload(models.Role.permissions))
+                              .where(models.User.email == email)
+                              )
     user = result.scalar_one_or_none()
     if not user or not verify_password(password, user.password):
         return False
@@ -57,15 +61,11 @@ def get_token_from_request(request: Request):
     return token
 
 
-async def get_current_user(
-        request: Request,
-        db: AsyncSession = Depends(get_pg_async_session)
-) -> models.User:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Не вдалося підтвердити облікові дані",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+async def get_current_user(request: Request,
+                           db: AsyncSession = Depends(get_pg_async_session)) -> models.User:
+    credentials_exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                          detail="Не вдалося підтвердити облікові дані",
+                                          headers={"WWW-Authenticate": "Bearer"})
     token = get_token_from_request(request)
     if not token:
         raise credentials_exception

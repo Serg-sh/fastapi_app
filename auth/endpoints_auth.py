@@ -7,10 +7,10 @@ from api_erp.utils import schemas, models
 from api_erp.utils.database import get_pg_async_session
 from auth import security
 
-router = APIRouter(prefix="/api/v1")
+router_auth = APIRouter(prefix="/api/v1")
 
 
-@router.post("/login/token", response_model=schemas.Token)
+@router_auth.post("/login/token", response_model=schemas.Token)
 async def login_for_access_token(response: Response,
                                  login_data: schemas.UserLogin,
                                  db: AsyncSession = Depends(get_pg_async_session)
@@ -23,8 +23,9 @@ async def login_for_access_token(response: Response,
             detail="Невірний email або пароль"
         )
     roles = security.get_user_roles(user)
+    permissions = security.get_user_permissions(user)
     access_token = security.create_access_token(
-        data={"sub": user.email, "user_id": user.id, "roles": roles},
+        data={"sub": user.email, "user_id": user.id, "roles": roles, "permissions": permissions},
         expires_delta=timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     response.set_cookie(
@@ -38,7 +39,7 @@ async def login_for_access_token(response: Response,
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.post("/permissions", status_code=201)
+@router_auth.post("/permissions", status_code=201)
 async def create_permission(name_perm: str,
                             db: AsyncSession = Depends(get_pg_async_session)
                             ):
@@ -54,7 +55,7 @@ async def create_permission(name_perm: str,
     await db.refresh(new_perm)
     return {"id": new_perm.id, "name_perm": new_perm.name_perm}
 
-@router.post("/roles", status_code=201)
+@router_auth.post("/roles", status_code=201)
 async def create_role(role_data: schemas.RoleCreate,
                       db: AsyncSession = Depends(get_pg_async_session)
                       ):
@@ -76,11 +77,16 @@ async def create_role(role_data: schemas.RoleCreate,
     db.add(new_role)
     await db.commit()
     await db.refresh(new_role)
-    return {"id": new_role.id, "name_role": new_role.name_role,
-            "permissions": [p.name_perm for p in new_role.permissions]}
+    result = await db.execute(select(models.Role)
+                              .options(selectinload(models.Role.permissions))
+                              .where(models.Role.id == new_role.id)
+    )
+    role_with_perms = result.scalar_one_or_none()
+    return {"id": role_with_perms.id, "name_role": role_with_perms.name_role,
+            "permissions": [p.name_perm for p in role_with_perms.permissions]}
 
 
-@router.post("/register", status_code=201)
+@router_auth.post("/register", status_code=201)
 async def register_user(user_data: schemas.UserCreate,
                         db: AsyncSession = Depends(get_pg_async_session)
                         ):
@@ -115,7 +121,7 @@ async def register_user(user_data: schemas.UserCreate,
             "roles": [r.name_role for r in user_with_roles.roles]}
 
 
-@router.delete("/users/{user_id}", status_code=204)
+@router_auth.delete("/users/{user_id}", status_code=204)
 async def delete_user(user_id: int, db: AsyncSession = Depends(get_pg_async_session)):
     from sqlalchemy import select
     result = await db.execute(select(models.User).where(models.User.id == user_id))
@@ -129,11 +135,12 @@ async def delete_user(user_id: int, db: AsyncSession = Depends(get_pg_async_sess
 
 
 # Приклад захищеного ендпоінта
-@router.get("/protected-resource")
-async def protected_resource(
-        current_user: models.User = Depends(security.get_current_user)
-):
+@router_auth.get("/protected-resource")
+async def protected_resource(current_user: models.User = Depends(security.get_current_user)):
     roles = security.get_user_roles(current_user)
-    if "admin" not in roles:
-        raise HTTPException(status_code=403, detail="Недостатньо прав")
-    return {"message": f"Вітаю, {current_user.email}! Ви маєте доступ як адміністратор."}
+    if "admin" in roles:
+        return {"message": f"Вітаю, {current_user.email}! Ви маєте доступ як адміністратор."}
+    elif "user" in roles:
+        return {"message": f"Вітаю, {current_user.email}! Ви маєте доступ як користувач."}
+    raise HTTPException(status_code=403, detail=f"{current_user.email} - Недостатньо прав")
+

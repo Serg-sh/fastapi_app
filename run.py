@@ -1,30 +1,19 @@
 import logging
 
 from fastapi import FastAPI
-from starlette.middleware.cors import CORSMiddleware
 
-from api_erp.main import app_api_erp
 from core.logger import logging_config
+from main_api_erp import app_erp
 
-app: FastAPI = app_api_erp  # main app
+app: FastAPI = app_erp  # main app
 logger = logging.getLogger(__name__)
 logging_config(level=logging.INFO)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=['*'],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # seconds app
 # app.mount("/", )
-# app.mount("", )
-# app.mount("/", )
 
-main_app = app
-
+main_app: FastAPI = app
 
 if __name__ == '__main__':
     import uvicorn
